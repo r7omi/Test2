@@ -37,28 +37,36 @@ jobs:
 
       - name: Create debug keystore and editor settings
         run: |
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           keytool -genkey -v -keystore "$HOME/debug.keystore" -alias androiddebugkey \
             -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
           mkdir -p "$HOME/.config/godot"
-          cat > "$HOME/.config/godot/editor_settings-4.3.tres" <<SETTINGS
-          [gd_resource type="EditorSettings" format=3]
-
-          [resource]
-          export/android/android_sdk_path = "$ANDROID_SDK_ROOT"
-          export/android/java_sdk_path = "$JAVA_HOME"
-          SETTINGS
-          sed -i 's/^          //' "$HOME/.config/godot/editor_settings-4.3.tres"
+          for f in editor_settings-4.tres editor_settings-4.3.tres; do
+            {
+              echo '[gd_resource type="EditorSettings" format=3]'
+              echo ''
+              echo '[resource]'
+              echo "export/android/android_sdk_path = \"$SDK\""
+              echo "export/android/java_sdk_path = \"$JAVA_HOME\""
+              echo "export/android/debug_keystore = \"$HOME/debug.keystore\""
+              echo 'export/android/debug_keystore_user = "androiddebugkey"'
+              echo 'export/android/debug_keystore_pass = "android"'
+            } > "$HOME/.config/godot/$f"
+          done
+          echo "SDK=$SDK JAVA_HOME=$JAVA_HOME"
+          ls "$SDK" "$SDK/build-tools" "$SDK/platforms" || true
+          ls "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable" || true
+          cat "$HOME/.config/godot/editor_settings-4.3.tres"
 
       - name: Export APK
-        env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
           export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/debug.keystore"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
           mkdir -p build
-          godot --headless --import || true
-          godot --headless --export-debug "Android" build/BlossomBlade.apk
+          godot --headless --verbose --import || true
+          godot --headless --verbose --export-debug "Android" build/BlossomBlade.apk
 
       - uses: actions/upload-artifact@v4
         with:
